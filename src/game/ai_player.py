@@ -1,6 +1,7 @@
 # src/game/ai_player.py
 
 import random
+from card import Card
 
 
 class AIPlayer:
@@ -46,33 +47,43 @@ class AIPlayer:
         """Check if all top cards are defeated."""
         return self.current_top_card_index >= len(self.top_cards)
 
-def decide_action(self, player_top_card):
-    """
-    Decide which card to play based on difficulty.
-    """
-    if not self.hand:
-        return None
+    def decide_action(self, player_top_card):
+        """
+        Decide which card to play based on difficulty.
 
-    if self.difficulty == 'Easy':
-        # Existing code...
-        return self.play_card(random.randint(0, len(self.hand) - 1))
-    elif self.difficulty == 'Medium':
-        # Existing code...
-        best_card = max(self.hand, key=lambda card: card.get_attack_value())
-        return self.play_card(self.hand.index(best_card))
-    elif self.difficulty == 'Hard':
-        # Ensure player_top_card is not None
-        if player_top_card is None:
-            # If player_top_card is None, default to Medium difficulty behavior
+        :param player_top_card: The player's current top card, used for decision-making in 'Hard' difficulty.
+        :return: The selected card to play.
+        """
+        if not self.hand:
+            return None
+
+        if self.difficulty == 'Easy':
+            # Randomly choose a card
+            card_index = random.randint(0, len(self.hand) - 1)
+            return self.play_card(card_index)
+
+        elif self.difficulty == 'Medium':
+            # Choose the card with the highest attack value
             best_card = max(self.hand, key=lambda card: card.get_attack_value())
             return self.play_card(self.hand.index(best_card))
 
-        # Hard mode logic
-        if player_top_card['health'] < 10:
-            # Use a low-value card to finish the player
-            best_card = min(self.hand, key=lambda card: card.get_attack_value())
-        else:
-            # Use a high-value card to deal significant damage
-            best_card = max(self.hand, key=lambda card: card.get_attack_value())
-        return self.play_card(self.hand.index(best_card))
+        elif self.difficulty == 'Hard':
+            # Ensure player_top_card is not None
+            if player_top_card is None:
+                # Default to Medium difficulty behavior
+                best_card = max(self.hand, key=lambda card: card.get_attack_value())
+                return self.play_card(self.hand.index(best_card))
 
+            # Hard mode logic
+            if player_top_card['health'] < 10:
+                # Use a low-value card to finish the player
+                best_card = min(self.hand, key=lambda card: card.get_attack_value())
+            else:
+                # Use a high-value card to deal significant damage
+                best_card = max(self.hand, key=lambda card: card.get_attack_value())
+            return self.play_card(self.hand.index(best_card))
+
+        else:
+            # If an unknown difficulty level is set, default to Easy
+            card_index = random.randint(0, len(self.hand) - 1)
+            return self.play_card(card_index)

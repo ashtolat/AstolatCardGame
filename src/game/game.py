@@ -18,7 +18,7 @@ class Game:
 
         self.deck = Deck(assets_path)
         self.player = Player('Player', assets_path)
-        self.ai_player = AIPlayer('AI', assets_path, difficulty)
+        self.ai_player = AIPlayer('AI', assets_path, difficulty=self.difficulty)
 
         self.current_turn = 'Player'
         self.running = True
