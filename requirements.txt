@@ -1,0 +1,3 @@
+pygame is a requirement of this program as it does not currently have an .exe
+
+to install pygame open command prompt and type "pip install pygame" (without quotations)
