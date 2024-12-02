@@ -20,10 +20,10 @@ class Button:
 
     def draw(self, screen):
         if self.image:
-            # Draw the image button
+            # Draw the button
             screen.blit(self.image, (self.x, self.y))
         else:
-            # Draw a rectangular button with text
+            # rectangular button 
             pygame.draw.rect(screen, (200, 200, 200), self.rect)
             if self.hovered:
                 pygame.draw.rect(screen, (255, 255, 255), self.rect, 2)

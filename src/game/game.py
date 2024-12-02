@@ -13,6 +13,7 @@ MAX_HAND_SIZE = 5  # Define the maximum hand size
 
 
 class Game:
+    # Initializes the game, loads assets, and sets up initial game state.
     def __init__(self, screen, difficulty='Easy'):
         self.screen = screen
         self.difficulty = difficulty
@@ -133,10 +134,12 @@ class Game:
         self.waiting_for_second_card = False
         self.selected_second_card_index = None
 
+    # Retrieves the path to the game's assets directory.
     def get_assets_path(self):
         base_path = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
         return os.path.join(base_path, 'assets')
 
+    # Creates the buttons for the player's Jesters to refresh their hand.
     def create_player_jester_buttons(self):
         self.player_jester_buttons.clear()
         jester_button_width = self.player_jester_image.get_width()
@@ -153,6 +156,7 @@ class Game:
             )
             self.player_jester_buttons.append(button)
 
+    # Toggles the visibility of the AI's hand on the screen.
     def toggle_show_ai_cards(self):
         self.show_ai_cards = not self.show_ai_cards
         if self.show_ai_cards:
@@ -160,9 +164,11 @@ class Game:
         else:
             self.show_ai_cards_button.text = "Show AI cards"
 
+    # Ends the game and returns to the main menu.
     def back_to_menu(self):
         self.running = False
 
+    # Allows the player to use a Jester to refresh their hand.
     def use_player_jester(self, index):
         if self.player_jesters > 0:
             # Discard all current hand cards
@@ -176,11 +182,13 @@ class Game:
             self.create_player_jester_buttons()
             self.current_turn = 'AI'
 
+    # Starts the game and initializes both players' hands.
     def start_game(self):
         self.player.draw_cards(self.deck, 5)
         self.ai_player.draw_cards(self.deck, 5)
         self.game_loop()
 
+    # Main game loop: processes events, updates game state, and renders frames.
     def game_loop(self):
         while self.running:
             self.handle_events()
@@ -195,6 +203,7 @@ class Game:
                 pygame.time.delay(1000)  # Delay for 1 second before AI action
                 self.start_ai_turn()
 
+    # Begins the player's turn by refilling their hand and logging it.
     def start_player_turn(self):
         # Refill player's hand to MAX_HAND_SIZE
         self.player.draw_cards(self.deck, MAX_HAND_SIZE - len(self.player.hand))
@@ -207,6 +216,7 @@ class Game:
         # Set the turn to Player
         self.current_turn = 'Player'
 
+    # Begins the AI's turn by refilling its hand and executing its action.
     def start_ai_turn(self):
         # Refill AI's hand to MAX_HAND_SIZE
         self.ai_player.draw_cards(self.deck, MAX_HAND_SIZE - len(self.ai_player.hand))
@@ -219,6 +229,7 @@ class Game:
         # Execute the AI's turn
         self.ai_turn()
     
+    # Ends the current turn and transitions to the next turn.
     def end_turn(self):
         self.hand_message_printed = False  # Reset for the next turn
         if self.current_turn == 'Player':
@@ -228,10 +239,12 @@ class Game:
             self.current_turn = 'Player'
             self.start_player_turn()
 
+    # Prints the player's or AI's current hand to the console.
     def hand_message(self, player_name, hand):
         hand_description = ', '.join([f"{card.value} of {card.suit}" for card in hand])
         print(f"{player_name}'s Hand: [{hand_description}]")
 
+    # Handles player input and UI interactions during the game.
     def handle_events(self):
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
@@ -255,6 +268,7 @@ class Game:
                         button.handle_event(event)
                     self.show_ai_cards_button.handle_event(event)
 
+    # Checks for win/lose conditions and updates the game state.
     def update_game_state(self):
         # Only check for game over conditions if the game isn't already over
         if not self.game_over:
@@ -265,6 +279,7 @@ class Game:
                 self.display_end_message("You have won the game!")
                 self.game_over = True
 
+    # Renders the game elements (e.g., cards, buttons, background) on the screen.
     def render(self):
         if self.game_over:
             self.draw_game_over_screen()
@@ -286,6 +301,7 @@ class Game:
         self.show_ai_cards_button.draw(self.screen)
         pygame.display.flip()
 
+    # Displays the game over screen when the game ends.
     def draw_game_over_screen(self):
         self.screen.fill((0, 0, 0))
         message_surface = self.font.render(self.message, True, (255, 255, 255))
@@ -293,6 +309,7 @@ class Game:
         self.screen.blit(message_surface, message_rect)
         self.back_to_menu_button.draw(self.screen)
 
+    # Draws the AI's remaining Jesters on the screen.
     def draw_ai_jesters(self):
         x = 10
         y = 10
@@ -300,6 +317,7 @@ class Game:
             self.screen.blit(self.ai_jester_image,
                              (x + i * (self.ai_jester_image.get_width() + 10), y))
 
+    # Displays the history of game actions on the screen.
     def draw_action_history(self):
         history_width = 280  # Reduced width to prevent overlap
         x = self.screen.get_width() - history_width - 10  # Positioned with some padding from the edge
@@ -320,6 +338,7 @@ class Game:
             if displayed_lines >= max_lines:
                 break
 
+    # Helper function to wrap long text for rendering.
     def wrap_text(self, text, font, max_width):
         """Helper function to wrap text for rendering."""
         words = text.split(' ')
@@ -336,11 +355,13 @@ class Game:
             lines.append(current_line.strip())
         return lines
 
+    # Adds a message to the action history for display.
     def add_action_to_history(self, message):
         self.action_history.append(message)
         if len(self.action_history) > 15:
             self.action_history.pop(0)
 
+    # Draws the player's hand of cards at the bottom of the screen.
     def draw_player_hand(self):
         hand = self.player.hand
         if not hand:
@@ -363,6 +384,7 @@ class Game:
             self.screen.blit(card.big_image, (x, y),
                              area=pygame.Rect(0, 0, card_width, card_height // 2 + 20))
 
+    # Draws the AI's hand of cards at the top of the screen.
     def draw_ai_hand(self):
         if not self.ai_player.hand:
             return
@@ -384,6 +406,7 @@ class Game:
                 # Show card backs if AI cards are hidden
                 self.screen.blit(self.mini_card_back_image, (x, base_y))
 
+    # Displays the current top cards of both players and their health.
     def draw_top_cards(self):
         player_top_card = self.player.top_cards[self.player.current_top_card_index]
         top_card_image = self.top_card_images[player_top_card['name']]
@@ -405,6 +428,7 @@ class Game:
         health_surface_ai = self.small_font.render(health_text_ai, True, (255, 255, 255))
         self.screen.blit(health_surface_ai, (x_ai + 105, y_ai - 25))
 
+    # Draws a health bar for a card based on its current health.
     def draw_health_bar(self, x, y, current_health, max_health):
         bar_width = 100
         bar_height = 10
@@ -414,6 +438,7 @@ class Game:
         pygame.draw.rect(self.screen, (255, 0, 0), fill_rect)
         pygame.draw.rect(self.screen, (255, 255, 255), outline_rect, 1)
 
+    # Determines which card was clicked based on the mouse position.
     def get_card_at_pos(self, pos):
         hand = self.player.hand
         if not hand:
@@ -432,6 +457,7 @@ class Game:
                 return i
         return None
 
+    # Processes the player's action based on the selected card.
     def player_turn(self, selected_card_index):
         selected_card = self.player.play_card(selected_card_index)
 
@@ -483,6 +509,7 @@ class Game:
             self.deck.discard(selected_card)
             self.current_turn = 'AI'
 
+    # Handles the player's decision-making for actions (attack, heal, etc)
     def get_player_action(self, actions, selected_card):
         self.create_action_buttons(actions)
         self.selected_action = None
@@ -512,6 +539,7 @@ class Game:
                 waiting_for_action = False
             self.clock.tick(60)
 
+    # Creates buttons for the player's action choices during their turn.
     def create_action_buttons(self, actions):
         self.action_buttons = []
         button_width = 200
@@ -535,9 +563,11 @@ class Game:
             )
             self.action_buttons.append(button)
 
+    # Processes the player's selected action (e.g., attack, heal, defend).
     def handle_action_selection(self, action_value):
         self.selected_action = action_value
 
+    # Waits for the player to select a second card for a Spades combo.
     def wait_for_second_card(self, spades_card):
         self.waiting_for_second_card = True
         while self.waiting_for_second_card and self.running:
@@ -557,27 +587,30 @@ class Game:
                 self.action_buttons.clear()
             self.clock.tick(60)
 
+    # Displays a message on the screen and logs it in the history.
     def display_message(self, message):
         #self.message = message
         print(message)
         if not self.waiting_for_second_card:
             self.add_action_to_history(message)
 
+    # Sets and displays the end-game message (win or lose)
     def display_end_message(self, message):
         self.message = message
         print(message)
 
+    # Renders a message at the top of the screen during the game
     def draw_message(self):
         if self.message:
             text_surface = self.font.render(self.message, True, (255, 255, 255))
             x = (self.screen.get_width() - text_surface.get_width()) // 2
             if self.waiting_for_second_card:
-                # Adjusted y-coordinate to move the message down
-                y = self.screen.get_height() - 200  # Changed from -250 to -200
+                y = self.screen.get_height() - 200
             else:
                 y = 20
             self.screen.blit(text_surface, (x, y))
 
+    # Executes the AI's turn by deciding and performing one action.
     def ai_turn(self):
         # Get the player's current top card
         player_top_card = None
@@ -623,6 +656,7 @@ class Game:
         # End AI's turn immediately after performing one action
         self.end_turn()
     
+    # Executes the AI's chosen action based on the selected card.
     def execute_ai_action(self, card):
         if card.suit == 'Hearts':
             own_top_card = self.ai_player.top_cards[self.ai_player.current_top_card_index]
@@ -638,6 +672,7 @@ class Game:
         else:
             self.execute_ai_attack(card)
 
+    # Executes an AI attack, including combos, and applies damage.
     def execute_ai_attack(self, card, combo_card=None):
         damage = card.get_attack_value()
         if combo_card:
@@ -656,6 +691,7 @@ class Game:
             attack_message += f" (using {card.suit} + {combo_card.suit})"
         self.display_message(attack_message)
 
+    # Applies the effects of defense cards and reduces damage
     def apply_defense(self, damage):
         if self.player.defense_active:
             damage = damage // 2

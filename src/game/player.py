@@ -11,7 +11,7 @@ class Player:
         self.hand = []
         self.assets_path = assets_path
 
-        # Top cards (e.g., Jack, Queen, King)
+        # Top cards
         self.top_cards = [
             {'name': 'Jack', 'health': 15, 'max_health': 15},
             {'name': 'Queen', 'health': 25, 'max_health': 25},

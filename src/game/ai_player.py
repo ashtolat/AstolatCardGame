@@ -28,7 +28,7 @@ class AIPlayer:
         self.jesters = 2
 
     def draw_cards(self, deck, num_cards):
-        """Draw a specified number of cards from the deck without exceeding MAX_HAND_SIZE."""
+        """Draw a specified number of cards from the deck without exceeding MAX_HAND_SIZE"""
         available_space = MAX_HAND_SIZE - len(self.hand)
         num_to_draw = min(num_cards, available_space)
         if num_to_draw > 0:
@@ -36,13 +36,13 @@ class AIPlayer:
             self.hand.extend(new_cards)
 
     def play_card(self, index):
-        """Play a card from the AI's hand."""
+        """Play a card from the AI's hand"""
         if index < 0 or index >= len(self.hand):
             raise IndexError("Invalid card index.")
         return self.hand.pop(index)
 
     def receive_damage(self, damage):
-        """Receive damage to the current top card."""
+        """Receive damage to the current top card"""
         current_top_card = self.top_cards[self.current_top_card_index]
         current_top_card['health'] -= damage
 

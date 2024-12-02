@@ -11,13 +11,13 @@ class Deck:
 
         suits = ['Hearts', 'Diamonds', 'Spades', 'Clubs']
         values = ['Ace', '2', '3', '4', '5', '6', '7',
-                  '8', '9', '10']  # Exclude 'Jack', 'Queen', 'King'
+                  '8', '9', '10']  # Excludes 'Jack', 'Queen', 'King' as they represent the Top cards
 
         for suit in suits:
             for value in values:
                 self.cards.append(Card(suit, value, assets_path))
 
-        # If Jesters are to be included in the deck
+        # Allow Jesters to be included in the deck
         # self.cards.append(Card('Jester', 'Black Jester', assets_path))
         # self.cards.append(Card('Jester', 'Red Jester', assets_path))
 
