@@ -220,7 +220,7 @@ class Game:
         self.ai_turn()
     
     def end_turn(self):
-        self.hand_message_printed = False  # Reset the flag for the next turn
+        self.hand_message_printed = False  # Reset for the next turn
         if self.current_turn == 'Player':
             self.current_turn = 'AI'
             self.start_ai_turn()
@@ -584,30 +584,44 @@ class Game:
         if self.player.current_top_card_index < len(self.player.top_cards):
             player_top_card = self.player.top_cards[self.player.current_top_card_index]
 
-        # AI decides which card to play based on difficulty and game state
+        # AI decides which card to play
         selected_card = self.ai_player.decide_action(player_top_card, self.player.defense_active)
-        if selected_card == 'Use Jester':
-            # AI uses a Jester to refresh its hand
-            if self.ai_jesters > 0:
+
+        # If AI uses a Jester to refresh its hand
+        if selected_card == "Use Jester":
+            if self.ai_player.jesters > 0:
                 for card in self.ai_player.hand:
                     self.deck.discard(card)
                 self.ai_player.hand.clear()
-                self.ai_player.draw_cards(self.deck, MAX_HAND_SIZE)
+                self.ai_player.draw_cards(self.deck, 5)
                 self.display_message("AI used a Jester to refresh its hand!")
-                self.ai_jesters -= 1
-            else:
-                self.display_message("AI tried to use a Jester but has none left.")
-            self.current_turn = 'Player'
+                self.ai_player.jesters -= 1
+            self.end_turn()  # End AI's turn after using Jester
             return
-        # Handle AI's selected card(s)
+
+        # Handle the selected card or action
         if isinstance(selected_card, tuple):  # Spades combo
             spade, combo_card = selected_card
             self.execute_ai_attack(spade, combo_card)
-        elif selected_card:  # Single card action
-            self.execute_ai_action(selected_card)
+        elif selected_card.suit == 'Hearts':
+            # Heal the AI's top card
+            top_card = self.ai_player.top_cards[self.ai_player.current_top_card_index]
+            heal_amount = selected_card.get_attack_value()
+            top_card['health'] = min(top_card['health'] + heal_amount, top_card['max_health'])
+            self.display_message(f"AI healed its {top_card['name']} for {heal_amount} health!")
+        elif selected_card.suit == 'Diamonds':
+            # Activate defense
+            self.ai_player.defense_active = True
+            self.display_message("AI has activated defense!")
         else:
-            self.display_message("AI has no cards to play.")
-            self.current_turn = 'Player'
+            # Default attack logic
+            self.execute_ai_attack(selected_card)
+
+        # Discard the selected card
+        self.deck.discard(selected_card)
+
+        # End AI's turn immediately after performing one action
+        self.end_turn()
     
     def execute_ai_action(self, card):
         if card.suit == 'Hearts':
@@ -629,19 +643,24 @@ class Game:
         if combo_card:
             damage += combo_card.get_attack_value()
             self.deck.discard(combo_card)
+
         if card.suit == 'Clubs':
-            damage *= 2
+            damage *= 2  # Double damage for Clubs
+
+        # Apply player defense, if active
         damage = self.apply_defense(damage)
+
         self.player.receive_damage(damage)
-        self.deck.discard(card)
         attack_message = f"AI attacked you for {damage} damage!"
         if combo_card:
             attack_message += f" (using {card.suit} + {combo_card.suit})"
         self.display_message(attack_message)
-        self.current_turn = 'Player'
 
     def apply_defense(self, damage):
         if self.player.defense_active:
             damage = damage // 2
             self.player.defense_active = False
+        elif self.ai_player.defense_active:
+            damage = damage // 2
+            self.ai_player.defense_active = False
         return damage

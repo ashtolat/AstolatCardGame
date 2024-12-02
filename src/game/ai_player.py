@@ -165,10 +165,11 @@ class AIPlayer:
                         best_action = card
 
             elif card.suit == 'Diamonds':  # Defense
-                if own_health < max_health * 0.6:
+                # Activate defense only if not already active
+                if not self.defense_active and own_health < max_health * 0.6:
                     score = max_health - own_health
                     if player_defense_active:
-                        score *= 0.5
+                        score *= 0.5  # Decrease priority if the player is defending
                     if score > best_score:
                         best_score = score
                         best_action = card
@@ -211,9 +212,11 @@ class AIPlayer:
                 self.hand.remove(spade)
                 self.hand.remove(combo_card)
                 return spade, combo_card
-            else:
-                self.hand.remove(best_action)
-                return best_action
+            elif best_action.suit == 'Diamonds':
+                # Activate defense when playing a Diamonds card
+                self.defense_active = True
+            self.hand.remove(best_action)
+            return best_action
 
         # Fallback to any card
         selected_card = random.choice(self.hand)
