@@ -60,12 +60,17 @@ class Menu:
             rules_title = self.font.render("Game Rules", True, (255, 255, 255))
             back_text = self.font.render("Back", True, (255, 255, 255))
 
-            # You can add more detailed rules here
             rules_content = [
                 "1. The game is played against an AI opponent.",
                 "2. Each player starts with 5 cards.",
                 "3. Defeat the opponent's top cards in order: Jack, Queen, King.",
-                # Add more rules as needed
+                "5. Use cards to attack, heal, defend, or activate abilities.",
+                "6. Hearts: Attack or heal based on card value.",
+                "7. Diamonds: Attack or defend based on card value.",
+                "8. Clubs: Attack with double damage.",
+                "9. Spades: Combine with another card for a stronger attack.",
+                "10. Jesters: Refresh your hand to 5 new cards.",
+                "11. Win by defeating all of your opponent's top cards.",
             ]
 
             self.screen.blit(rules_title, (50, 50))
