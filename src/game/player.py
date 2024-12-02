@@ -2,6 +2,8 @@
 
 from card import Card
 
+MAX_HAND_SIZE = 5  # Define the maximum hand size
+
 
 class Player:
     def __init__(self, name, assets_path):
@@ -21,9 +23,12 @@ class Player:
         self.defense_active = False
 
     def draw_cards(self, deck, num_cards):
-        """Draw a specified number of cards from the deck."""
-        new_cards = deck.draw(num_cards)
-        self.hand.extend(new_cards)
+        """Draw a specified number of cards from the deck without exceeding MAX_HAND_SIZE."""
+        available_space = MAX_HAND_SIZE - len(self.hand)
+        num_to_draw = min(num_cards, available_space)
+        if num_to_draw > 0:
+            new_cards = deck.draw(num_to_draw)
+            self.hand.extend(new_cards)
 
     def play_card(self, index):
         """Play a card from the player's hand."""

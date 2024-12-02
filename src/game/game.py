@@ -9,6 +9,8 @@ from ai_player import AIPlayer
 from utils import get_card
 from button import Button
 
+MAX_HAND_SIZE = 5  # Define the maximum hand size
+
 
 class Game:
     def __init__(self, screen, difficulty='Easy'):
@@ -26,11 +28,14 @@ class Game:
 
         self.font = pygame.font.Font(os.path.join(assets_path, 'font.ttf'), 24)
         self.small_font = pygame.font.Font(os.path.join(assets_path, 'font.ttf'), 18)
+        self.history_font = pygame.font.Font(os.path.join(assets_path, 'font.ttf'), 16)  # Smaller font for history
         self.background = pygame.image.load(
             os.path.join(assets_path, 'background.png')).convert()
         self.clock = pygame.time.Clock()
         self.message = ""
         self.defense_active = False
+
+        self.hand_message_printed = False  # Flag to ensure hand is printed only once per turn
 
         # Card dimensions and scaling factors
         self.big_card_width = 48
@@ -160,13 +165,13 @@ class Game:
 
     def use_player_jester(self, index):
         if self.player_jesters > 0:
-            num_cards_needed = 5 - len(self.player.hand)
-            if num_cards_needed > 0:
-                self.player.hand.clear()
-                self.player.draw_cards(self.deck, 5)
-                self.display_message("You have refreshed your hand using a Jester!")
-            else:
-                self.display_message("Your hand is already full!")
+            # Discard all current hand cards
+            for card in self.player.hand:
+                self.deck.discard(card)
+            self.player.hand.clear()
+            # Draw 5 new cards
+            self.player.draw_cards(self.deck, 5)
+            self.display_message("You have refreshed your hand using a Jester!")
             self.player_jesters -= 1
             self.create_player_jester_buttons()
             self.current_turn = 'AI'
@@ -191,20 +196,41 @@ class Game:
                 self.start_ai_turn()
 
     def start_player_turn(self):
-        if len(self.player.hand) < 5:
-            self.player.draw_cards(self.deck, 1)
-        if len(self.player.hand) == 0:
-            self.player.draw_cards(self.deck, 5)
-            self.display_message("Your hand was empty! Drawing 5 new cards.")
+        # Refill player's hand to MAX_HAND_SIZE
+        self.player.draw_cards(self.deck, MAX_HAND_SIZE - len(self.player.hand))
         
+        # Log the player's hand to the command line once
+        if not self.hand_message_printed:
+            self.hand_message("Player", self.player.hand)
+            self.hand_message_printed = True
+
+        # Set the turn to Player
+        self.current_turn = 'Player'
 
     def start_ai_turn(self):
-        if len(self.ai_player.hand) < 5:
-            self.ai_player.draw_cards(self.deck, 1)
-        if len(self.ai_player.hand) == 0:
-            self.ai_player.draw_cards(self.deck, 5)
-            self.display_message("AI's hand was empty! AI draws 5 new cards.")
+        # Refill AI's hand to MAX_HAND_SIZE
+        self.ai_player.draw_cards(self.deck, MAX_HAND_SIZE - len(self.ai_player.hand))
+        
+        # Log the AI's hand to the command line once
+        if self.hand_message_printed:
+            self.hand_message("AI", self.ai_player.hand)
+            self.hand_message_printed = False
+
+        # Execute the AI's turn
         self.ai_turn()
+    
+    def end_turn(self):
+        self.hand_message_printed = False  # Reset the flag for the next turn
+        if self.current_turn == 'Player':
+            self.current_turn = 'AI'
+            self.start_ai_turn()
+        else:
+            self.current_turn = 'Player'
+            self.start_player_turn()
+
+    def hand_message(self, player_name, hand):
+        hand_description = ', '.join([f"{card.value} of {card.suit}" for card in hand])
+        print(f"{player_name}'s Hand: [{hand_description}]")
 
     def handle_events(self):
         for event in pygame.event.get():
@@ -230,12 +256,14 @@ class Game:
                     self.show_ai_cards_button.handle_event(event)
 
     def update_game_state(self):
-        if self.player.is_defeated():
-            self.display_message("You have been defeated!")
-            self.game_over = True
-        elif self.ai_player.is_defeated():
-            self.display_message("You have won the game!")
-            self.game_over = True
+        # Only check for game over conditions if the game isn't already over
+        if not self.game_over:
+            if self.player.is_defeated():
+                self.display_end_message("You have been defeated!")
+                self.game_over = True
+            elif self.ai_player.is_defeated():
+                self.display_end_message("You have won the game!")
+                self.game_over = True
 
     def render(self):
         if self.game_over:
@@ -273,15 +301,40 @@ class Game:
                              (x + i * (self.ai_jester_image.get_width() + 10), y))
 
     def draw_action_history(self):
-        x = self.screen.get_width() - 300
-        y = 100
-        line_height = 25
+        history_width = 280  # Reduced width to prevent overlap
+        x = self.screen.get_width() - history_width - 10  # Positioned with some padding from the edge
+        y = 50  # Positioned below the AI's mini cards
+        line_height = 20  # Smaller line height
+        max_width = history_width
+        max_lines = (self.screen.get_height() - y - 10) // line_height
+
+        displayed_lines = 0
         for entry in reversed(self.action_history[-15:]):
-            text_surface = self.small_font.render(entry, True, (255, 255, 255))
-            self.screen.blit(text_surface, (x, y))
-            y += line_height
-            if y > self.screen.get_height() - line_height:
+            wrapped_lines = self.wrap_text(entry, self.history_font, max_width)
+            for line in wrapped_lines:
+                if displayed_lines >= max_lines:
+                    break
+                text_surface = self.history_font.render(line, True, (255, 255, 255))
+                self.screen.blit(text_surface, (x, y + displayed_lines * line_height))
+                displayed_lines += 1
+            if displayed_lines >= max_lines:
                 break
+
+    def wrap_text(self, text, font, max_width):
+        """Helper function to wrap text for rendering."""
+        words = text.split(' ')
+        lines = []
+        current_line = ""
+        for word in words:
+            test_line = current_line + word + " "
+            if font.size(test_line)[0] <= max_width:
+                current_line = test_line
+            else:
+                lines.append(current_line.strip())
+                current_line = word + " "
+        if current_line:
+            lines.append(current_line.strip())
+        return lines
 
     def add_action_to_history(self, message):
         self.action_history.append(message)
@@ -311,23 +364,25 @@ class Game:
                              area=pygame.Rect(0, 0, card_width, card_height // 2 + 20))
 
     def draw_ai_hand(self):
-        hand = self.ai_player.hand
-        if not hand:
+        if not self.ai_player.hand:
             return
-        card_spacing = 10
-        card_width = hand[0].mini_image.get_width()
-        card_height = hand[0].mini_image.get_height()
-        total_width = len(hand) * card_width + (len(hand) - 1) * card_spacing
-        start_x = (self.screen.get_width() - total_width) // 2
-        base_y = 10
 
-        for i, card in enumerate(hand):
+        # Card positioning
+        card_spacing = 20
+        card_width = self.ai_player.hand[0].mini_image.get_width()
+        card_height = self.ai_player.hand[0].mini_image.get_height()
+        total_width = len(self.ai_player.hand) * card_width + (len(self.ai_player.hand) - 1) * card_spacing
+        start_x = (self.screen.get_width() - total_width) // 2  # Center horizontally
+        base_y = 10  # Top margin
+
+        for i, card in enumerate(self.ai_player.hand):
             x = start_x + i * (card_width + card_spacing)
-            y = base_y
             if self.show_ai_cards:
-                self.screen.blit(card.mini_image, (x, y))
+                # Show actual AI cards if toggled on
+                self.screen.blit(card.mini_image, (x, base_y))
             else:
-                self.screen.blit(self.mini_card_back_image, (x, y))
+                # Show card backs if AI cards are hidden
+                self.screen.blit(self.mini_card_back_image, (x, base_y))
 
     def draw_top_cards(self):
         player_top_card = self.player.top_cards[self.player.current_top_card_index]
@@ -389,17 +444,11 @@ class Game:
             self.get_player_action(actions, selected_card)
         elif selected_card.suit == 'Clubs':
             base_damage = selected_card.get_attack_value()
-            damage = base_damage * 2  # Double the damage for Clubs
+            damage = base_damage * 2  # Double damage for Clubs
             self.ai_player.receive_damage(damage)
             message = f"You attacked for {damage} damage with Clubs (double damage)!"
             self.display_message(message)
-            # Discard the card
             self.deck.discard(selected_card)
-            # Check if player's hand is empty
-            if len(self.player.hand) == 0:
-                self.player.draw_cards(self.deck, 1)  # Only draw one card
-                self.display_message("Your hand was empty! Drawing 1 new card.")
-            # End of player's turn
             self.current_turn = 'AI'
         elif selected_card.suit == 'Diamonds':
             actions = [
@@ -424,15 +473,7 @@ class Game:
             self.ai_player.receive_damage(damage)
             message = f"You dealt {damage} damage with an Ace!"
             self.display_message(message)
-            max_hand_limit = 5
-            cards_needed = max_hand_limit - len(self.player.hand)
-            if cards_needed > 0:
-                self.player.draw_cards(self.deck, cards_needed)
-                self.display_message(f"You refilled your hand to {max_hand_limit} cards!")
             self.deck.discard(selected_card)
-            if len(self.player.hand) == 0:
-                self.player.draw_cards(self.deck, 5)
-                self.display_message("Your hand was empty! Drawing 5 new cards.")
             self.current_turn = 'AI'
         else:
             damage = selected_card.get_attack_value()
@@ -440,9 +481,6 @@ class Game:
             message = f"You attacked for {damage} damage!"
             self.display_message(message)
             self.deck.discard(selected_card)
-            if len(self.player.hand) == 0:
-                self.player.draw_cards(self.deck, 5)
-                self.display_message("Your hand was empty! Drawing 5 new cards.")
             self.current_turn = 'AI'
 
     def get_player_action(self, actions, selected_card):
@@ -469,9 +507,6 @@ class Game:
                     self.player.defense_active = True
                     self.display_message("You have activated defense!")
                 self.deck.discard(selected_card)
-                if len(self.player.hand) == 0:
-                    self.player.draw_cards(self.deck, 5)
-                    self.display_message("Your hand was empty! Drawing 5 new cards.")
                 self.current_turn = 'AI'
                 self.action_buttons.clear()
                 waiting_for_action = False
@@ -509,16 +544,13 @@ class Game:
             self.handle_events()
             self.render()
             if self.selected_second_card_index is not None:
-                second_card = self.player.hand.pop(self.selected_second_card_index)
+                second_card = self.player.play_card(self.selected_second_card_index)
                 total_damage = spades_card.get_attack_value() + second_card.get_attack_value()
                 self.ai_player.receive_damage(total_damage)
                 message = f"You attacked for {total_damage} damage with Spades combo!"
                 self.display_message(message)
                 self.deck.discard(spades_card)
                 self.deck.discard(second_card)
-                if len(self.player.hand) == 0:
-                    self.player.draw_cards(self.deck, 5)
-                    self.display_message("Your hand was empty! Drawing 5 new cards.")
                 self.current_turn = 'AI'
                 self.waiting_for_second_card = False
                 self.selected_second_card_index = None
@@ -526,102 +558,86 @@ class Game:
             self.clock.tick(60)
 
     def display_message(self, message):
-        self.message = message
+        #self.message = message
         print(message)
         if not self.waiting_for_second_card:
             self.add_action_to_history(message)
+
+    def display_end_message(self, message):
+        self.message = message
+        print(message)
 
     def draw_message(self):
         if self.message:
             text_surface = self.font.render(self.message, True, (255, 255, 255))
             x = (self.screen.get_width() - text_surface.get_width()) // 2
             if self.waiting_for_second_card:
-                y = self.screen.get_height() - 250
+                # Adjusted y-coordinate to move the message down
+                y = self.screen.get_height() - 200  # Changed from -250 to -200
             else:
                 y = 20
             self.screen.blit(text_surface, (x, y))
 
     def ai_turn(self):
-        # Pass the player's current top card to the AI's decide_action method
-        player_top_card = self.player.top_cards[self.player.current_top_card_index]
-        selected_card = self.ai_player.decide_action(player_top_card)
-        if selected_card is None:
-            self.display_message("AI has no cards to play.")
+        # Get the player's current top card
+        player_top_card = None
+        if self.player.current_top_card_index < len(self.player.top_cards):
+            player_top_card = self.player.top_cards[self.player.current_top_card_index]
+
+        # AI decides which card to play based on difficulty and game state
+        selected_card = self.ai_player.decide_action(player_top_card, self.player.defense_active)
+        if selected_card == 'Use Jester':
+            # AI uses a Jester to refresh its hand
+            if self.ai_jesters > 0:
+                for card in self.ai_player.hand:
+                    self.deck.discard(card)
+                self.ai_player.hand.clear()
+                self.ai_player.draw_cards(self.deck, MAX_HAND_SIZE)
+                self.display_message("AI used a Jester to refresh its hand!")
+                self.ai_jesters -= 1
+            else:
+                self.display_message("AI tried to use a Jester but has none left.")
             self.current_turn = 'Player'
             return
-
-        if selected_card.suit == 'Hearts':
-            action = random.choice(['Attack', 'Heal'])
-            if action == 'Attack':
-                damage = selected_card.get_attack_value()
-                damage = self.apply_defense(damage)
-                self.player.receive_damage(damage)
-                message = f"AI attacked you for {damage} damage!"
-                self.display_message(message)
-            elif action == 'Heal':
-                top_card = self.ai_player.top_cards[self.ai_player.current_top_card_index]
-                heal_amount = selected_card.get_attack_value()
-                top_card['health'] = min(top_card['health'] + heal_amount, top_card['max_health'])
-                message = f"AI healed its {top_card['name']} for {heal_amount} health!"
-                self.display_message(message)
-        elif selected_card.suit == 'Clubs':
-            base_damage = selected_card.get_attack_value()
-            damage = base_damage * 2  # Double the damage for Clubs
-            damage = selected_card.get_attack_value()
-            damage = self.apply_defense(damage)
-            self.player.receive_damage(damage)
-            message = f"AI attacked you for {damage} damage ({base_damage} x2) with Clubs!"
-            self.display_message(message)
-        elif selected_card.suit == 'Diamonds':
-            action = random.choice(['Attack', 'Defense'])
-            if action == 'Attack':
-                damage = selected_card.get_attack_value()
-                damage = self.apply_defense(damage)
-                self.player.receive_damage(damage)
-                message = f"AI attacked you for {damage} damage!"
-                self.display_message(message)
-            elif action == 'Defense':
-                self.ai_player.defense_active = True
-                self.display_message("AI has activated defense!")
-        elif selected_card.suit == 'Spades':
-            if len(self.ai_player.hand) == 0:
-                damage = selected_card.get_attack_value()
-                damage = self.apply_defense(damage)
-                self.player.receive_damage(damage)
-                message = f"AI attacked you for {damage} damage with Spades!"
-                self.display_message(message)
-            else:
-                second_card = self.ai_player.play_card(0)
-                total_damage = selected_card.get_attack_value() + second_card.get_attack_value()
-                total_damage = self.apply_defense(total_damage)
-                self.player.receive_damage(total_damage)
-                message = f"AI attacked you for {total_damage} damage with Spades combo!"
-                self.display_message(message)
-                self.deck.discard(second_card)
-        elif selected_card.value == 'Ace':
-            damage = 1
-            damage = self.apply_defense(damage)
-            self.player.receive_damage(damage)
-            message = f"AI dealt {damage} damage with an Ace!"
-            self.display_message(message)
-            max_hand_limit = 5
-            cards_needed = max_hand_limit - len(self.ai_player.hand)
-            if cards_needed > 0:
-                self.ai_player.draw_cards(self.deck, cards_needed)
-                self.display_message("AI refilled its hand!")
+        # Handle AI's selected card(s)
+        if isinstance(selected_card, tuple):  # Spades combo
+            spade, combo_card = selected_card
+            self.execute_ai_attack(spade, combo_card)
+        elif selected_card:  # Single card action
+            self.execute_ai_action(selected_card)
         else:
-            damage = selected_card.get_attack_value()
-            damage = self.apply_defense(damage)
-            self.player.receive_damage(damage)
-            message = f"AI attacked you for {damage} damage!"
-            self.display_message(message)
+            self.display_message("AI has no cards to play.")
+            self.current_turn = 'Player'
+    
+    def execute_ai_action(self, card):
+        if card.suit == 'Hearts':
+            own_top_card = self.ai_player.top_cards[self.ai_player.current_top_card_index]
+            if own_top_card['health'] < own_top_card['max_health'] / 2:
+                heal_amount = card.get_attack_value()
+                own_top_card['health'] = min(own_top_card['health'] + heal_amount, own_top_card['max_health'])
+                self.display_message(f"AI healed its {own_top_card['name']} for {heal_amount} health!")
+            else:
+                self.execute_ai_attack(card)
+        elif card.suit == 'Diamonds':
+            self.ai_player.defense_active = True
+            self.display_message("AI has activated defense!")
+        else:
+            self.execute_ai_attack(card)
 
-        self.deck.discard(selected_card)
-        if len(self.ai_player.hand) == 0:
-            self.ai_player.draw_cards(self.deck, 5)
-            self.display_message("AI's hand was empty! AI draws 5 new cards.")
-        if self.ai_player.defense_active:
-            self.ai_player.defense_active = False
+    def execute_ai_attack(self, card, combo_card=None):
+        damage = card.get_attack_value()
+        if combo_card:
+            damage += combo_card.get_attack_value()
+            self.deck.discard(combo_card)
+        if card.suit == 'Clubs':
+            damage *= 2
+        damage = self.apply_defense(damage)
+        self.player.receive_damage(damage)
+        self.deck.discard(card)
+        attack_message = f"AI attacked you for {damage} damage!"
+        if combo_card:
+            attack_message += f" (using {card.suit} + {combo_card.suit})"
+        self.display_message(attack_message)
         self.current_turn = 'Player'
 
     def apply_defense(self, damage):

@@ -3,6 +3,8 @@
 import random
 from card import Card
 
+MAX_HAND_SIZE = 5 # maximum hand size
+
 
 class AIPlayer:
     def __init__(self, name, assets_path, difficulty='Easy'):
@@ -22,13 +24,16 @@ class AIPlayer:
         # Defense status
         self.defense_active = False
 
-        # Jesters (if used in your game)
+        # Jesters
         self.jesters = 2
 
     def draw_cards(self, deck, num_cards):
-        """Draw a specified number of cards from the deck."""
-        new_cards = deck.draw(num_cards)
-        self.hand.extend(new_cards)
+        """Draw a specified number of cards from the deck without exceeding MAX_HAND_SIZE."""
+        available_space = MAX_HAND_SIZE - len(self.hand)
+        num_to_draw = min(num_cards, available_space)
+        if num_to_draw > 0:
+            new_cards = deck.draw(num_to_draw)
+            self.hand.extend(new_cards)
 
     def play_card(self, index):
         """Play a card from the AI's hand."""
@@ -50,154 +55,174 @@ class AIPlayer:
         """Check if all top cards are defeated."""
         return self.current_top_card_index >= len(self.top_cards)
 
-    def decide_action(self, player_top_card):
+    def decide_action(self, player_top_card, player_defense_active):
         """
-        Decide which card to play based on difficulty.
-
-        :param player_top_card: The player's current top card.
-        :return: The selected card to play.
+        Decides the best action based on the AI's behavior level.
         """
-        if not self.hand:
-            return None
-
-        if self.difficulty == 'Easy':
-            return self.easy_behavior()
-        elif self.difficulty == 'Medium':
-            return self.medium_behavior(player_top_card)
-        elif self.difficulty == 'Hard':
-            return self.hard_behavior(player_top_card)
+        if self.hand:  # Ensure the hand is not empty
+            if self.difficulty == 'Hard':
+                return self.hard_behavior(player_top_card, player_defense_active)
+            elif self.difficulty == 'Medium':
+                return self.medium_behavior(player_top_card)
+            else:
+                return self.easy_behavior()
         else:
-            # Default to Easy behavior if difficulty is unrecognized
-            return self.easy_behavior()
+            return None  # No cards to play
 
     def easy_behavior(self):
-        """Easy AI behavior: Randomly selects a card to play."""
-        # Filter attack cards (e.g., non-healing, non-defensive)
+        """
+        Easy AI behavior: Randomly selects a card to play.
+        """
         attack_cards = [card for card in self.hand if card.suit != 'Diamonds']
         if attack_cards:
             selected_card = random.choice(attack_cards)
-            self.hand.remove(selected_card)
-            return selected_card
         else:
-            # If no attack cards, play any available card
             selected_card = random.choice(self.hand)
-            self.hand.remove(selected_card)
-            return selected_card
+        self.hand.remove(selected_card)
+        return selected_card
 
     def medium_behavior(self, player_top_card):
-        """Medium AI behavior: Maximizes short-term gains."""
+        """
+        Medium AI behavior: Balances short-term gains and survival.
+        """
         if not player_top_card:
             # If player top card is not available, default to Easy behavior
             return self.easy_behavior()
 
-        # Analyze own top card health
+        # Analyze health ratios
         own_top_card = self.top_cards[self.current_top_card_index]
         own_health_ratio = own_top_card['health'] / own_top_card['max_health']
-
-        # Prioritize attacking if opponent's face card is weak
         player_health_ratio = player_top_card['health'] / player_top_card['max_health']
 
-        # Decide whether to attack or defend/heal
+        # Heal or defend if health is low
         if own_health_ratio < 0.3:
-            # If own health is low, consider healing or defense
             heal_cards = [card for card in self.hand if card.suit == 'Hearts']
             defense_cards = [card for card in self.hand if card.suit == 'Diamonds']
-
-            # Prefer healing over defense
             if heal_cards:
                 selected_card = max(heal_cards, key=lambda c: c.get_attack_value())
-                self.hand.remove(selected_card)
-                return selected_card
             elif defense_cards:
                 selected_card = max(defense_cards, key=lambda c: c.get_attack_value())
-                self.hand.remove(selected_card)
-                return selected_card
+            else:
+                selected_card = random.choice(self.hand)  # Fallback
+            self.hand.remove(selected_card)
+            return selected_card
 
-        # If opponent's health is low, attempt to finish them off
+        # Attack with strong cards if player's health is low
         if player_health_ratio < 0.3:
             attack_cards = [card for card in self.hand if card.suit != 'Hearts']
             if attack_cards:
-                # Use the strongest attack card
                 selected_card = max(attack_cards, key=lambda c: c.get_attack_value())
                 self.hand.remove(selected_card)
                 return selected_card
 
-        # Otherwise, conserve powerful cards and use moderate attacks
-        moderate_attack_cards = [card for card in self.hand if 4 <= card.get_attack_value() <= 7]
-        if moderate_attack_cards:
-            selected_card = random.choice(moderate_attack_cards)
+        # Use moderate attacks or fallback to weak attacks
+        attack_cards = sorted(
+            (card for card in self.hand if card.suit != 'Hearts'),
+            key=lambda c: c.get_attack_value()
+        )
+        if attack_cards:
+            moderate_attacks = [card for card in attack_cards if 4 <= card.get_attack_value() <= 7]
+            selected_card = random.choice(moderate_attacks) if moderate_attacks else attack_cards[0]
             self.hand.remove(selected_card)
             return selected_card
-        else:
-            # If no moderate cards, play any attack card
-            attack_cards = [card for card in self.hand if card.suit != 'Hearts']
-            if attack_cards:
-                selected_card = min(attack_cards, key=lambda c: c.get_attack_value())
-                self.hand.remove(selected_card)
-                return selected_card
 
-        # If no attack cards, play any available card
+        # Fallback to any card
         selected_card = random.choice(self.hand)
         self.hand.remove(selected_card)
         return selected_card
 
-    def hard_behavior(self, player_top_card):
-        """Hard AI behavior: Uses advanced strategies and predictive modeling."""
+    def hard_behavior(self, player_top_card, player_defense_active):
+        """
+        Hard AI behavior: Uses strategic decision-making.
+        """
         if not player_top_card:
-            # If player top card is not available, default to Medium behavior
+            # Default to Medium behavior if player_top_card is not available
             return self.medium_behavior(player_top_card)
 
-        # Analyze own top card and player's top card
+        # Analyze health ratios
         own_top_card = self.top_cards[self.current_top_card_index]
-        own_health_ratio = own_top_card['health'] / own_top_card['max_health']
-        player_health_ratio = player_top_card['health'] / player_top_card['max_health']
+        own_health = own_top_card['health']
+        max_health = own_top_card['max_health']
+        player_health = player_top_card['health']
 
-        # Predictive modeling (simplified for this context)
-        # Assume player may have high-damage cards if hand size > 3
-        potential_threat = len(self.hand) > 3
-
-        # Decide whether to defend
-        if potential_threat and own_health_ratio < 0.6:
-            defense_cards = [card for card in self.hand if card.suit == 'Diamonds']
-            if defense_cards:
-                selected_card = max(defense_cards, key=lambda c: c.get_attack_value())
-                self.hand.remove(selected_card)
-                return selected_card
-
-        # Use Jesters strategically
-        if self.jesters > 0 and own_health_ratio < 0.3:
-            # Use a Jester to refresh hand or heal (implement according to your game rules)
+        # Joker Logic: Refresh hand if all cards are low value
+        average_card_value = sum(card.get_attack_value() for card in self.hand) / len(self.hand)
+        if average_card_value < 4 and self.jesters > 0:
             self.jesters -= 1
-            # Assuming Jester allows drawing new cards
-            # Implement Jester logic in your game (e.g., draw new cards)
-            # For now, we'll skip the action and proceed
-            pass
+            return "Use Jester"
 
-        # Optimize use of high-value cards
-        high_value_attack_cards = [card for card in self.hand if card.get_attack_value() >= 8]
-        if player_health_ratio < 0.5 and high_value_attack_cards:
-            # Use high-value card to deal significant damage
-            selected_card = max(high_value_attack_cards, key=lambda c: c.get_attack_value())
-            self.hand.remove(selected_card)
-            return selected_card
+        best_action = None
+        best_score = float('-inf')
 
-        # Balance offensive and defensive strategies
-        if own_health_ratio < 0.5:
-            # Consider healing
-            heal_cards = [card for card in self.hand if card.suit == 'Hearts']
-            if heal_cards:
-                selected_card = max(heal_cards, key=lambda c: c.get_attack_value())
-                self.hand.remove(selected_card)
-                return selected_card
+        # Evaluate all possible actions
+        for card in self.hand:
+            if card.suit == 'Hearts':  # Healing
+                if own_health < max_health:
+                    heal_amount = min(max_health - own_health, card.get_attack_value())
+                    score = heal_amount * 2
+                    if score > best_score:
+                        best_score = score
+                        best_action = card
 
-        # Default to moderate attacks
-        moderate_attack_cards = [card for card in self.hand if 5 <= card.get_attack_value() <= 10]
-        if moderate_attack_cards:
-            selected_card = max(moderate_attack_cards, key=lambda c: c.get_attack_value())
-            self.hand.remove(selected_card)
-            return selected_card
+            elif card.suit == 'Diamonds':  # Defense
+                if own_health < max_health * 0.6:
+                    score = max_health - own_health
+                    if player_defense_active:
+                        score *= 0.5
+                    if score > best_score:
+                        best_score = score
+                        best_action = card
 
-        # If no other options, play any available card
+            elif card.suit == 'Clubs':  # Double damage attack
+                attack_value = card.get_attack_value() * 2
+                overkill_penalty = max(0, attack_value - player_health)
+                score = (player_health * 3) - overkill_penalty
+                if score > best_score:
+                    best_score = score
+                    best_action = card
+
+            elif card.suit == 'Spades':  # Combined attack
+                for combo_card in self.hand:
+                    if combo_card == card:
+                        continue
+                    combined_value = card.get_attack_value() + combo_card.get_attack_value()
+                    overkill_penalty = max(0, combined_value - player_health)
+                    score = (player_health * 4) - overkill_penalty
+                    if combo_card.suit == 'Clubs':
+                        double_damage_value = combo_card.get_attack_value() * 2
+                        if double_damage_value > combined_value:
+                            score -= double_damage_value
+                    if score > best_score:
+                        best_score = score
+                        best_action = (card, combo_card)
+
+            else:  # Basic attack
+                attack_value = card.get_attack_value()
+                overkill_penalty = max(0, attack_value - player_health)
+                score = (player_health * 2) - overkill_penalty
+                if score > best_score:
+                    best_score = score
+                    best_action = card
+
+        # Execute best action
+        if best_action:
+            if isinstance(best_action, tuple):  # Spades combo
+                spade, combo_card = best_action
+                self.hand.remove(spade)
+                self.hand.remove(combo_card)
+                return spade, combo_card
+            else:
+                self.hand.remove(best_action)
+                return best_action
+
+        # Fallback to any card
         selected_card = random.choice(self.hand)
         self.hand.remove(selected_card)
         return selected_card
+
+
+
+
+    def get_hand_description(self):
+        """Return a formatted string of the AI's current hand."""
+        return ', '.join([f"{card.suit} {card.rank}" for card in self.hand])
